@@ -2,6 +2,9 @@
 
 This fork is based on the HORAYZON repository. See the description below for more details.
 In this version, the repository is intended to be ported to Windows and serve as a foundation for future projects.
+downlaod embree-4.4.0.x64.windiows.zip, source: https://github.com/RenderKit/embree/releases
+download oneapi-tbb-2022.3.0-win.zip, source: https://github.com/uxlfoundation/oneTBB/releases 
+
 
 # HORAYZON
 
