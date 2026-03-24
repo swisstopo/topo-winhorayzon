@@ -25,17 +25,24 @@ def get_path_aux_data():
     path_horayzon = os.path.join(os.path.split(
         os.path.dirname(horayzon.__file__))[0], "horayzon/")
     if not os.path.isfile(path_horayzon + "/" + file_name):
-        valid_path = False
-        print("Provide path for auxiliary data:")
-        while not valid_path:
-            path_aux_data = os.path.join(input(), "")
-            if os.path.isdir(path_aux_data):
-                valid_path = True
-            else:
-                print("Provided path is invalid - try again:")
-        file = open(path_horayzon + "/" + file_name, "w")
-        file.write(path_aux_data)
-        file.close()
+        if os.getenv("TEMP"):
+            return os.getenv("TEMP") + "/"
+        elif os.getenv("TMP"):
+            return os.getenv("TMP") + "/"
+        elif os.getenv("TMPDIR"):
+            return os.getenv("TMPDIR") + "/"
+        else:
+            valid_path = False
+            print("Provide path for auxiliary data:")
+            while not valid_path:
+                path_aux_data = os.path.join(input(), "")
+                if os.path.isdir(path_aux_data):
+                    valid_path = True
+                else:
+                    print("Provided path is invalid - try again:")
+            file = open(path_horayzon + "/" + file_name, "w")
+            file.write(path_aux_data)
+            file.close()
     else:
         file = open(path_horayzon + "/" + file_name, "r")
         path_aux_data = file.read()

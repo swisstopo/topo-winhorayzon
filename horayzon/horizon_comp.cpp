@@ -2,6 +2,8 @@
 // MIT License
 
 #include <cstdio>
+#include <cstdint>  // for int32_t, uint8_t (Windows compatibility)
+#include <vector>   // for std::vector (Windows VLA alternative)
 #include <embree4/rtcore.h>
 #include <stdio.h>
 #include <math.h>
@@ -110,8 +112,6 @@ RTCScene initializeScene(RTCDevice device, float* vert_grid,
   	//rtcSetSceneBuildQuality(scene, RTC_BUILD_QUALITY_HIGH);
 
   	int num_vert = (dem_dim_0 * dem_dim_1);
-  	printf("DEM dimensions: (%d, %d) \n", dem_dim_0, dem_dim_1);
-  	printf("Number of vertices: %d \n", num_vert);
 
 	RTCGeometryType rtc_geom_type;
 	if (strcmp(geom_type, "triangle") == 0) {
@@ -130,9 +130,7 @@ RTCScene initializeScene(RTCDevice device, float* vert_grid,
 	// Triangle
 	//-------------------------------------------------------------------------
 	if (strcmp(geom_type, "triangle") == 0) {
-		cout << "Selected geometry type: triangle" << endl;
   		int num_tri = ((dem_dim_0 - 1) * (dem_dim_1 - 1)) * 2;
-  		printf("Number of triangles: %d \n", num_tri);
   		Triangle* triangles = (Triangle*) rtcSetNewGeometryBuffer(geom,
   			RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(Triangle),
   			num_tri);
@@ -153,9 +151,7 @@ RTCScene initializeScene(RTCDevice device, float* vert_grid,
 	// Quad
 	//-------------------------------------------------------------------------
   	} else if (strcmp(geom_type, "quad") == 0) {
-  		cout << "Selected geometry type: quad" << endl;
-		int num_quad = ((dem_dim_0 - 1) * (dem_dim_1 - 1));
-  		printf("Number of quads: %d \n", num_quad);							   
+		int num_quad = ((dem_dim_0 - 1) * (dem_dim_1 - 1));							   
   		Quad* quads = (Quad*) rtcSetNewGeometryBuffer(geom,
   			RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT4, sizeof(Quad),
   			num_quad);
@@ -172,9 +168,8 @@ RTCScene initializeScene(RTCDevice device, float* vert_grid,
   	}    	
 	//-------------------------------------------------------------------------
 	// Grid
-	//-------------------------------------------------------------------------  	
+	//-------------------------------------------------------------------------
   	} else {
-  		cout << "Selected geometry type: grid" << endl;
 		RTCGrid* grid = (RTCGrid*)rtcSetNewGeometryBuffer(geom,
 			RTC_BUFFER_TYPE_GRID, 0, RTC_FORMAT_GRID, sizeof(RTCGrid), 1);
 		grid[0].startVertexID = 0;
@@ -183,8 +178,6 @@ RTCScene initializeScene(RTCDevice device, float* vert_grid,
 		grid[0].height        = dem_dim_0;
   	}
 	//-------------------------------------------------------------------------
-
-	auto start = std::chrono::high_resolution_clock::now();
 
 	// Commit geometry
 	rtcCommitGeometry(geom);
@@ -197,10 +190,6 @@ RTCScene initializeScene(RTCDevice device, float* vert_grid,
 	//-------------------------------------------------------------------------
 
 	if (num_vert_simp >= 3) {
-	
-		cout << "Add triangles for outer simplified domain" << endl;
-		printf("- number of verties: %d \n", num_vert_simp);
-		printf("- number of triangles: %d \n", num_tri_simp);
 
 		RTCGeometry geom_add = rtcNewGeometry(device,
 			RTC_GEOMETRY_TYPE_TRIANGLE);
@@ -221,10 +210,6 @@ RTCScene initializeScene(RTCDevice device, float* vert_grid,
 
 	// Commit scene
 	rtcCommitScene(scene);
-
-	auto end = std::chrono::high_resolution_clock::now();
-	std::chrono::duration<double> time = end - start;
-	cout << "BVH build time: " << time.count() << " s" << endl;
 
 	return scene;
 
@@ -640,28 +625,13 @@ void horizon_gridded_comp(float* vert_grid,
 	uint8_t* mask, float hori_fill,
 	float ray_org_elev) {
 
-	cout << "--------------------------------------------------------" << endl;
-	cout << "Horizon computation with Intel Embree" << endl;
-	cout << "--------------------------------------------------------" << endl;
-
 	// Hard-coded settings
   	float elev_ang_up_lim = 89.98;  // upper limit for elevation angle [degree]
-  
-  	// Initialization
-  	auto start_ini = std::chrono::high_resolution_clock::now();
 
+  	// Initialization
   	RTCDevice device = initializeDevice();
   	RTCScene scene = initializeScene(device, vert_grid, dem_dim_0, dem_dim_1,
   		geom_type, vert_simp, num_vert_simp, tri_ind_simp, num_tri_simp);
-
-  	// Query properties of device
-  	// bool cullingEnabled = rtcGetDeviceProperty(device,
-  	//	RTC_DEVICE_PROPERTY_BACKFACE_CULLING_ENABLED);
-  	// cout << "Backface culling enabled: " << cullingEnabled << endl;
-
-  	auto end_ini = std::chrono::high_resolution_clock::now();
-  	std::chrono::duration<double> time = end_ini - start_ini;
-  	cout << "Total initialisation time: " << time.count() << " s" << endl;
 
   	// Unit conversions
   	hori_acc = deg2rad(hori_acc);
@@ -670,46 +640,30 @@ void horizon_gridded_comp(float* vert_grid,
   	dist_search *= 1000.0;  // [kilometre] -> [metre]
 
 	// Select algorithm for horizon detection
-  	cout << "Horizon detection algorithm: ";
   	if (strcmp(ray_algorithm, "discrete_sampling") == 0) {
-		cout << "discrete_sampling" << endl;
   		function_pointer = ray_discrete_sampling;
   	} else if (strcmp(ray_algorithm, "binary_search") == 0) {
-		cout << "binary search" << endl;
 		function_pointer = ray_binary_search;
   	} else if (strcmp(ray_algorithm, "guess_constant") == 0) {
-		cout << "guess horizon from previous azimuth direction" << endl;
 		function_pointer = ray_guess_const;
 	}
 
-  	int num_gc_tot = (dim_in_0 * dim_in_1);
   	int num_gc = 0;
   	for (size_t i = 0; i < (size_t)(dim_in_0 * dim_in_1); i++) {
   		if (mask[i] == 1) {
   			num_gc += 1;
   		}
   	}
-  	printf("Number of grid cells for which horizon is computed: %d \n",
-  		num_gc);
-  	cout << "Fraction of total number of grid cells: " << ((float)num_gc 
-  		/ (float)num_gc_tot * 100.0) << " %" << endl;
-
-	float hori_buffer_size = (((float)dim_in_0 * (float)dim_in_1
-		* (float)azim_num * 4.0) / pow(10.0, 9.0));
-	cout << "Total memory required for horizon output: " 
-		<< hori_buffer_size << " GB" << endl;
 
 	size_t num_rays = 0;
-  	std::chrono::duration<double> time_ray = std::chrono::seconds(0);
-  	std::chrono::duration<double> time_out = std::chrono::seconds(0);
 
 	// ------------------------------------------------------------------------
   	// Allocate and initialise arrays with evaluated trigonometric functions
 	// ------------------------------------------------------------------------
 
-	// Azimuth angles (allocate on stack)
-	float azim_sin[azim_num];
-	float azim_cos[azim_num];
+	// Azimuth angles (use std::vector for MSVC compatibility)
+	std::vector<float> azim_sin(azim_num);
+	std::vector<float> azim_cos(azim_num);
 	float ang;
 	for (int i = 0; i < azim_num; i++) {
 		ang = ((2 * M_PI) / azim_num * i);
@@ -717,12 +671,12 @@ void horizon_gridded_comp(float* vert_grid,
 		azim_cos[i] = cos(ang);
 	}
 
-	// Elevation angles (allocate on stack)
+	// Elevation angles (use std::vector for MSVC compatibility)
 	int elev_num = ((int)ceil((elev_ang_up_lim - elev_ang_low_lim)
 		/ (hori_acc / 5.0)) + 1);
-	float elev_ang[elev_num];
-	float elev_sin[elev_num];
-	float elev_cos[elev_num];
+	std::vector<float> elev_ang(elev_num);
+	std::vector<float> elev_sin(elev_num);
+	std::vector<float> elev_cos(elev_num);
 	for (int i = 0; i < elev_num; i++) {
 		ang = elev_ang_up_lim - (hori_acc / 5.0) * i;
 		elev_ang[elev_num - i - 1] = ang;
@@ -733,8 +687,6 @@ void horizon_gridded_comp(float* vert_grid,
 	// ------------------------------------------------------------------------
 	// Perform ray tracing
 	// ------------------------------------------------------------------------
-
-	auto start_ray = std::chrono::high_resolution_clock::now();
 
 	num_rays += tbb::parallel_reduce(
 		tbb::blocked_range<size_t>(0,dim_in_0), 0.0,
@@ -783,8 +735,8 @@ void horizon_gridded_comp(float* vert_grid,
 					azim_num, hori_acc, dist_search,
 					elev_ang_low_lim, elev_ang_up_lim, elev_num,
 					scene, num_rays, &hori_buffer[ind_hori],
-					azim_sin, azim_cos, elev_ang,
-					elev_cos, elev_sin, rot_inv);
+					azim_sin.data(), azim_cos.data(), elev_ang.data(),
+					elev_cos.data(), elev_sin.data(), rot_inv);
 
 			} else {
 				for (int k = 0; k < azim_num; k++) {
@@ -799,26 +751,10 @@ void horizon_gridded_comp(float* vert_grid,
 	return num_rays;  // parallel
 	}, std::plus<size_t>());  // parallel
 
-	auto end_ray = std::chrono::high_resolution_clock::now();
-	time_ray += (end_ray - start_ray);
-
-	cout << "Ray tracing time: " << time_ray.count() << " s" << endl;
-
-  	// Print number of rays needed for location and azimuth direction
-  	cout << "Number of rays shot: " << num_rays << endl;	
-  	float ratio = (float)num_rays / (float)(num_gc * azim_num);
-  	printf("Average number of rays per location and azimuth: %.2f \n", ratio);
-
   	// Release resources allocated through Embree
   	rtcReleaseScene(scene);
   	rtcReleaseDevice(device);
 
-  	auto end_tot = std::chrono::high_resolution_clock::now();
-  	time = end_tot - start_ini;
-  	cout << "Total run time: " << time.count() << " s" << endl;
-
-	cout << "--------------------------------------------------------" << endl;
- 
 }
 
 //#############################################################################
@@ -838,10 +774,6 @@ void horizon_locations_comp(float* vert_grid,
 	float* ray_org_elev,
 	int hori_dist_out) {
 
-	cout << "--------------------------------------------------------" << endl;
-	cout << "Horizon computation with Intel Embree" << endl;
-	cout << "--------------------------------------------------------" << endl;
-
 	// Hard-coded settings
   	float elev_ang_up_lim = 89.98;  // upper limit for elevation angle [degree]
 
@@ -852,15 +784,9 @@ void horizon_locations_comp(float* vert_grid,
 	int num_tri_simp = 1;
 
   	// Initialization
-  	auto start_ini = std::chrono::high_resolution_clock::now();
-
   	RTCDevice device = initializeDevice();
   	RTCScene scene = initializeScene(device, vert_grid, dem_dim_0, dem_dim_1,
   		geom_type, vert_simp, num_vert_simp, tri_ind_simp, num_tri_simp);
-
-  	auto end_ini = std::chrono::high_resolution_clock::now();
-  	std::chrono::duration<double> time = end_ini - start_ini;
-  	cout << "Total initialisation time: " << time.count() << " s" << endl;
 
   	// Unit conversions
   	hori_acc = deg2rad(hori_acc);
@@ -868,20 +794,15 @@ void horizon_locations_comp(float* vert_grid,
   	elev_ang_up_lim = deg2rad(elev_ang_up_lim);
   	dist_search *= 1000.0;  // [kilometre] -> [metre]
 
-  	printf("Number of locations for which horizon is computed: %d \n",
-  		num_loc);
-
 	size_t num_rays = 0;
-  	std::chrono::duration<double> time_ray = std::chrono::seconds(0);
-  	std::chrono::duration<double> time_out = std::chrono::seconds(0);
   	
 	// ------------------------------------------------------------------------
   	// Allocate and initialise arrays with evaluated trigonometric functions
 	// ------------------------------------------------------------------------
 
-	// Azimuth angles (allocate on stack)
-	float azim_sin[azim_num];
-	float azim_cos[azim_num];
+	// Azimuth angles (use std::vector for MSVC compatibility)
+	std::vector<float> azim_sin(azim_num);
+	std::vector<float> azim_cos(azim_num);
 	float ang;
 	for (int i = 0; i < azim_num; i++) {
 		ang = ((2 * M_PI) / azim_num * i);
@@ -889,12 +810,12 @@ void horizon_locations_comp(float* vert_grid,
 		azim_cos[i] = cos(ang);
 	}
 
-	// Elevation angles (allocate on stack)
+	// Elevation angles (use std::vector for MSVC compatibility)
 	int elev_num = ((int)ceil((elev_ang_up_lim - elev_ang_low_lim)
 		/ (hori_acc / 5.0)) + 1);
-	float elev_ang[elev_num];
-	float elev_sin[elev_num];
-	float elev_cos[elev_num];
+	std::vector<float> elev_ang(elev_num);
+	std::vector<float> elev_sin(elev_num);
+	std::vector<float> elev_cos(elev_num);
 	for (int i = 0; i < elev_num; i++) {
 		ang = elev_ang_up_lim - (hori_acc / 5.0) * i;
 		elev_ang[elev_num - i - 1] = ang;
@@ -909,19 +830,13 @@ void horizon_locations_comp(float* vert_grid,
 	if (hori_dist_out == 0) {  // (horizon elevation angle)
 
 		// Select algorithm for horizon detection
-  		cout << "Horizon detection algorithm: ";
   		if (strcmp(ray_algorithm, "discrete_sampling") == 0) {
-			cout << "discrete_sampling" << endl;
   			function_pointer = ray_discrete_sampling;
   		} else if (strcmp(ray_algorithm, "binary_search") == 0) {
-			cout << "binary search" << endl;
 			function_pointer = ray_binary_search;
   		} else if (strcmp(ray_algorithm, "guess_constant") == 0) {
-			cout << "guess horizon from previous azimuth direction" << endl;
 			function_pointer = ray_guess_const;
 		}
-
-   		auto start_ray = std::chrono::high_resolution_clock::now();
 
 		num_rays += tbb::parallel_reduce(
 			tbb::blocked_range<size_t>(0,num_loc), 0.0,
@@ -977,8 +892,8 @@ void horizon_locations_comp(float* vert_grid,
   					azim_num, hori_acc, dist_search,
   					elev_ang_low_lim, elev_ang_up_lim, elev_num,
   					scene, num_rays, &hori_buffer[ind_out],
-  					azim_sin, azim_cos, elev_ang,
-  					elev_cos, elev_sin, rot_inv);
+  					azim_sin.data(), azim_cos.data(), elev_ang.data(),
+  					elev_cos.data(), elev_sin.data(), rot_inv);
   				
   			}
 
@@ -987,22 +902,14 @@ void horizon_locations_comp(float* vert_grid,
   		return num_rays;  // parallel
   		}, std::plus<size_t>());  // parallel
 
-  		auto end_ray = std::chrono::high_resolution_clock::now();
-  		time_ray += (end_ray - start_ray);
-
   	} else { // (horizon elevation angle and distance)
 
 		// Select algorithm for horizon detection
-  		cout << "Horizon detection algorithm: ";
   		if (strcmp(ray_algorithm, "discrete_sampling") == 0) {
-			cout << "discrete_sampling" << endl;
   			function_pointer_hori_dist = ray_discrete_sampling_hori_dist;
   		} else if (strcmp(ray_algorithm, "binary_search") == 0) {
-			cout << "binary search" << endl;
 			function_pointer_hori_dist = ray_binary_search_hori_dist;
 		}
-
-   		auto start_ray = std::chrono::high_resolution_clock::now();
 
 		num_rays += tbb::parallel_reduce(
 			tbb::blocked_range<size_t>(0,num_loc), 0.0,
@@ -1059,8 +966,8 @@ void horizon_locations_comp(float* vert_grid,
   					elev_ang_low_lim, elev_ang_up_lim, elev_num,
   					scene, num_rays, &hori_buffer[ind_out],
 					&hori_dist_buffer[ind_out],
-  					azim_sin, azim_cos, elev_ang,
-  					elev_cos, elev_sin, rot_inv);
+  					azim_sin.data(), azim_cos.data(), elev_ang.data(),
+  					elev_cos.data(), elev_sin.data(), rot_inv);
   					
   			}
 
@@ -1069,26 +976,10 @@ void horizon_locations_comp(float* vert_grid,
   		return num_rays;  // parallel
   		}, std::plus<size_t>());  // parallel
 
-  		auto end_ray = std::chrono::high_resolution_clock::now();
-  		time_ray += (end_ray - start_ray);
-
 	}
-
-	cout << "Ray tracing time: " << time_ray.count() << " s" << endl;
-
-	// Print number of rays needed for location and azimuth direction
-	cout << "Number of rays shot: " << num_rays << endl;
-	float ratio = (float)num_rays / (float)(num_loc * azim_num);
-	printf("Average number of rays per location and azimuth: %.2f \n", ratio);
 
   	// Release resources allocated through Embree
   	rtcReleaseScene(scene);
   	rtcReleaseDevice(device);
 
-  	auto end_tot = std::chrono::high_resolution_clock::now();
-  	time = end_tot - start_ini;
-  	cout << "Total run time: " << time.count() << " s" << endl;
-
-	cout << "--------------------------------------------------------" << endl;
- 
 }

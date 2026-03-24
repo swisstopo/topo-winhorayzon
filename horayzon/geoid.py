@@ -13,7 +13,7 @@ import gzip
 
 # -----------------------------------------------------------------------------
 
-def undulation(lon_ip, lat_ip, geoid="EGM96"):
+def undulation(lon_ip, lat_ip, geoid="EGM96", path_to_aux_data=None):
     """Compute geoid undulation.
 
     Compute the geoid undulation for the EGM96 or GEOID12A geoid by bilinear
@@ -58,8 +58,12 @@ def undulation(lon_ip, lat_ip, geoid="EGM96"):
         lat_dec = True
         lat_ip = lat_ip[::-1]
 
+    # get path to auxilary data
+    if not path_to_aux_data:
+        path_aux_data = get_path_aux_data()
+    else:
+        path_aux_data = path_to_aux_data
     # Compute geoid undulation
-    path_aux_data = get_path_aux_data()
     data_ip = np.empty((len(lat_ip), len(lon_ip)), dtype=np.float64)
     # -------------------------------------------------------------------------
     if geoid == "EGM96":

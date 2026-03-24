@@ -202,8 +202,6 @@ RTCScene initializeScene(RTCDevice device, float* vert_grid,
   	rtcSetSceneFlags(scene, RTC_SCENE_FLAG_ROBUST);
 
   	int num_vert = (dem_dim_0 * dem_dim_1);
-  	printf("DEM dimensions: (%d, %d) \n", dem_dim_0, dem_dim_1);
-  	printf("Number of vertices: %d \n", num_vert);
 
 	RTCGeometryType rtc_geom_type;
 	if (strcmp(geom_type, "triangle") == 0) {
@@ -222,9 +220,7 @@ RTCScene initializeScene(RTCDevice device, float* vert_grid,
 	// Triangle
 	//-------------------------------------------------------------------------
 	if (strcmp(geom_type, "triangle") == 0) {
-		cout << "Selected geometry type: triangle" << endl;
   		int num_tri = ((dem_dim_0 - 1) * (dem_dim_1 - 1)) * 2;
-  		printf("Number of triangles: %d \n", num_tri);
   		Triangle* triangles = (Triangle*) rtcSetNewGeometryBuffer(geom,
   			RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(Triangle),
   			num_tri);
@@ -245,9 +241,7 @@ RTCScene initializeScene(RTCDevice device, float* vert_grid,
 	// Quad
 	//-------------------------------------------------------------------------
   	} else if (strcmp(geom_type, "quad") == 0) {
-  		cout << "Selected geometry type: quad" << endl;
-		int num_quad = ((dem_dim_0 - 1) * (dem_dim_1 - 1));
-  		printf("Number of quads: %d \n", num_quad);							   
+		int num_quad = ((dem_dim_0 - 1) * (dem_dim_1 - 1));							   
   		Quad* quads = (Quad*) rtcSetNewGeometryBuffer(geom,
   			RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT4, sizeof(Quad),
   			num_quad);
@@ -264,9 +258,8 @@ RTCScene initializeScene(RTCDevice device, float* vert_grid,
   	}    	
 	//-------------------------------------------------------------------------
 	// Grid
-	//-------------------------------------------------------------------------  	
+	//-------------------------------------------------------------------------
   	} else {
-  		cout << "Selected geometry type: grid" << endl;
 		RTCGrid* grid = (RTCGrid*)rtcSetNewGeometryBuffer(geom,
 			RTC_BUFFER_TYPE_GRID, 0, RTC_FORMAT_GRID, sizeof(RTCGrid), 1);
     	grid[0].startVertexID = 0;
@@ -276,22 +269,14 @@ RTCScene initializeScene(RTCDevice device, float* vert_grid,
   	}
 	//-------------------------------------------------------------------------
 
-	auto start = std::chrono::high_resolution_clock::now();
-
 	// Commit geometry
 	rtcCommitGeometry(geom);
 
 	rtcAttachGeometry(scene, geom);
 	rtcReleaseGeometry(geom);
 
-	//-------------------------------------------------------------------------
-
 	// Commit scene
 	rtcCommitScene(scene);
-
-	auto end = std::chrono::high_resolution_clock::now();
-	std::chrono::duration<double> time = end - start;
-	cout << "BVH build time: " << time.count() << " s" << endl;
 
 	return scene;
 
@@ -353,29 +338,8 @@ void CppTerrain::initialise(float* vert_grid,
 	float R_d = 287.0;  // gas constant for dry air [J K􏰅-1 kg􏰅-1]
 	exp_cl = (g / (R_d * lapse_rate_cl));  // exponent for barometric formula 
 
-	auto start_ini = std::chrono::high_resolution_clock::now();
-
 	scene = initializeScene(device, vert_grid, dem_dim_0, dem_dim_1,
 		geom_type);
-	
-	auto end_ini = std::chrono::high_resolution_clock::now();
-  	std::chrono::duration<double> time = end_ini - start_ini;
-  	cout << "Total initialisation time: " << time.count() << " s" << endl;
-  	
-  	int num_gc_tot = (dim_in_0 * dim_in_1);
-  	int num_gc = 0;
-  	for (size_t i = 0; i < (size_t)(dim_in_0 * dim_in_1); i++) {
-  		if (mask[i] == 1) {
-  			num_gc += 1;
-  		}
-  	}  	
-  	printf("Considered grid cells (number): %d \n", num_gc);
-  	cout << "Considered grid cells (fraction from total): " << ((float)num_gc 
-  		/ (float)num_gc_tot * 100.0) << " %" << endl;
-  		
-  	if (refrac_cor_cl == 1) {
-  		cout << "Account for atmospheric refraction" << endl;
-  	}
 
 }
 

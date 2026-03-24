@@ -8,7 +8,6 @@ import numpy as np
 from libc.math cimport sin, cos, sqrt, atan
 from libc.math cimport M_PI
 from libc.math cimport NAN
-from libc.stdio cimport printf
 from scipy.linalg.cython_lapack cimport sgesv
 
 
@@ -75,9 +74,6 @@ def slope_plane_meth(x, y, z, rot_mat=None, output_rot=False):
     if rot_mat is None:
         rot_mat = np.empty(x.shape + (3, 3), dtype=np.float32)
         rot_mat[...,:,:] = np.eye(3, dtype=np.float32)
-        print("No rotation matrices provided, use identity matrices")
-        print(np.eye(3, dtype=np.float32))
-        print("that cause no rotation")
     vec_tilt = _slope_plane_meth_cy(x, y, z, rot_mat, output_rot)
     return vec_tilt
 
@@ -201,10 +197,7 @@ def _slope_plane_meth_cy(float[:, :] x, float[:, :] y, float[:, :] z,
             vec_tilt[i, j, 2] = vec_z
 
     # Rotate output vectors
-    if output_rot:
-        printf("Tilted surface normals are rotated according to 'rot_mat'\n")
-    else:
-
+    if not output_rot:
         # Rotate vector back to input reference frame (-> use transposes of
         # rotation matrices)
         for i in range(1, (len_0 - 1)):
@@ -352,8 +345,6 @@ def _slope_vector_meth_cy(float[:, :] x, float[:, :] y, float[:, :] z,
 
     # Rotate output vectors
     if output_rot:
-        printf("Tilted surface normals are rotated according to 'rot_mat'\n")
-
         for i in range(1, (len_0 - 1)):
             for j in range(1, (len_1 - 1)):
                 vec_x = rot_mat[i, j, 0, 0] * vec_tilt[i, j, 0] \
