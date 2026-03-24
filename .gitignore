@@ -1,3 +1,5 @@
+*.pyd
+*.c
 /build/
 /embree/
 /tbb/
