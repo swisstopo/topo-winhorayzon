@@ -19,10 +19,12 @@ import zipfile
 from shapely.ops import unary_union
 from rasterio.features import rasterize
 from rasterio.transform import Affine
+from osgeo import gdal
 import horayzon as hray
 import horayzon.ocean_masking as ocean_masking
 
 mpl.style.use("classic")
+gdal.UseExceptions()
 
 # -----------------------------------------------------------------------------
 # Settings
@@ -43,6 +45,7 @@ dem_file_url = "https://srtm.csi.cgiar.org/wp-content/uploads/files/" \
 path_out = os.path.join(r"C:\\", "temp", "topo-winhorayzon")
 file_hori = "hori_SRTM_South_Georgia.nc"
 file_topo_par = "topo_par_SRTM_South_Georgia.nc"
+path_to_aux_data = r"C:\temp/"
 
 # -----------------------------------------------------------------------------
 # Compute and save topographic parameters
@@ -73,7 +76,7 @@ mask_land_dem = (elevation != -32768.0)
 elevation[~mask_land_dem] = 0.0
 
 # Compute ellipsoidal heights
-elevation += hray.geoid.undulation(lon, lat, geoid="EGM96")  # [m]
+elevation += hray.geoid.undulation(lon, lat, geoid="EGM96", path_to_aux_data=path_to_aux_data)  # [m]
 
 # Compute indices of inner domain
 slice_in = (slice(np.where(lat >= domain["lat_max"])[0][-1],
@@ -198,7 +201,7 @@ ds = xr.Dataset(
     )
 )
 encoding = {i: {"_FillValue": None} for i in ("azim", "lat", "lon")}
-ds.to_netcdf(path_out + file_hori, encoding=encoding)
+ds.to_netcdf(os.path.join(path_out, file_hori), encoding=encoding)
 
 # Compute rotation matrix (global ENU -> local ENU)
 rot_mat_glob2loc = hray.transform.rotation_matrix_glob2loc(vec_north_enu,
@@ -245,4 +248,4 @@ ds = xr.Dataset(
 )
 encoding = {i: {"_FillValue": None} for i in
             ("lat", "lon", "elevation", "slope", "aspect")}
-ds.to_netcdf(path_out + file_topo_par, encoding=encoding)
+ds.to_netcdf(os.path.join(path_out, file_topo_par), encoding=encoding)
