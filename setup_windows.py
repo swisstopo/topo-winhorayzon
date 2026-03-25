@@ -1,6 +1,6 @@
-# Description: Setup file for Windows
+# Description: Setup file for Windows (MinGW only)
 #
-# Build and assemble module: python setup_windows.py build_ext --inplace
+# Build: python setup_windows.py build_ext --inplace
 #
 # MIT License
 # Windows adaptation: 2024
@@ -28,81 +28,67 @@ print(f"Python version: {sys.version}")
 # Base path of the project
 base_path = os.path.dirname(os.path.abspath(__file__))
 
-# Paths to Embree and TBB (shipped with the project)
+# Paths to Embree (shipped with the project)
 embree_include = os.path.join(base_path, "embree", "include")
-embree_lib_dir = os.path.join(base_path, "embree", "lib")
 embree_bin_dir = os.path.join(base_path, "embree", "bin")
 
-tbb_include = os.path.join(base_path, "tbb", "include")
-tbb_lib_dir = os.path.join(base_path, "tbb", "lib", "intel64", "vc14")
+# Paths to MinGW-built TBB
+tbb_include_dir = r"C:\work\git\tbb-mingw\include\oneapi"
+tbb_lib_dir     = r"C:\work\git\tbb-mingw\lib"
 
 # Verify paths exist
-for path, name in [(embree_include, "Embree include"),
-                   (embree_lib_dir, "Embree lib"),
-                   (tbb_include, "TBB include"),
-                   (tbb_lib_dir, "TBB lib")]:
+for path, name in [(embree_include,  "Embree include"),
+                   (embree_bin_dir,  "Embree bin"),
+                   (tbb_include_dir, "TBB include (MinGW)"),
+                   (tbb_lib_dir,     "TBB lib (MinGW)")]:
     if not os.path.exists(path):
         raise FileNotFoundError(f"{name} directory not found: {path}")
 
-print(f"Embree include: {embree_include}")
-print(f"Embree lib: {embree_lib_dir}")
-print(f"TBB include: {tbb_include}")
-print(f"TBB lib: {tbb_lib_dir}")
+print(f"Embree include : {embree_include}")
+print(f"Embree bin     : {embree_bin_dir}")
+print(f"TBB include    : {tbb_include_dir}")
+print(f"TBB lib        : {tbb_lib_dir}")
+print("Compiler       : MinGW/g++")
 
-# Compiler flags
-# Default: MSVC (required for supplied Embree/TBB libs)
-# Optional: MinGW (set USE_MINGW=1 in environment)
-use_mingw = os.environ.get("USE_MINGW", "").lower() in ("1", "true", "yes")
-if use_mingw:
-    print("Using MinGW/g++ mode (USE_MINGW=1).")
-    extra_compile_args_cpp = [
-        "-O2",
-        "-std=c++14",
-        "-fPIC",
-        "-Wall",
-    ]
-    extra_compile_args_cython = ["-O2"]
-    extra_link_args_cpp = []
-    os.environ["CC"] = "gcc"
-    os.environ["CXX"] = "g++"
-    compiler_options = {"build_ext": {"compiler": "mingw32"}}
-else:
-    print("Using MSVC mode (default).")
-    # /O2 - Optimize for speed
-    # /std:c++14 - C++14 standard (required for TBB)
-    # /EHsc - Exception handling
-    # /D_USE_MATH_DEFINES - Enable M_PI constant
-    extra_compile_args_cpp = [
-        "/O2",
-        "/std:c++14",
-        "/EHsc",
-        "/D_USE_MATH_DEFINES",
-    ]
-    extra_compile_args_cython = ["/O2"]
-    extra_link_args_cpp = []
-    compiler_options = {}
+# -----------------------------------------------------------------------------
+# Compiler settings (MinGW only)
+# -----------------------------------------------------------------------------
 
-# Include directories
+os.environ["CC"]  = "gcc"
+os.environ["CXX"] = "g++"
+
+extra_compile_args_cpp = [
+    "-O2",
+    "-std=c++14",
+    "-fPIC",
+    "-Wall",
+    "-D_USE_MATH_DEFINES",
+]
+extra_compile_args_cython = ["-O2"]
+extra_link_args_cpp = []
+compiler_options = {"build_ext": {"compiler": "mingw32"}}
+
+# Include directories for C++ modules
+# tbb_include_dir MUST be first to override any other TBB headers (e.g. conda)
 include_dirs_cpp = [
+    tbb_include_dir,
     np.get_include(),
     embree_include,
-    os.path.join(tbb_include, "oneapi"),  # TBB headers are under oneapi/tbb/
 ]
 
 # Library directories
+# Note: embree\lib is intentionally excluded - it contains MSVC-only .lib files
 library_dirs = [
-    embree_lib_dir,
     tbb_lib_dir,
+    embree_bin_dir,
 ]
 
-# Libraries to link (without .lib extension)
-libraries_cpp = ["embree4", "tbb12"]
-
-# No POSIX libraries on Windows
+# Libraries to link
+libraries_cpp    = ["embree4", "tbb12"]
 libraries_cython = []
 
 # -----------------------------------------------------------------------------
-# Clean old Cython-generated files (forces regeneration with current NumPy API)
+# Clean old Cython-generated files
 # -----------------------------------------------------------------------------
 
 cython_generated = [
@@ -123,7 +109,6 @@ for gen_file in cython_generated:
 # -----------------------------------------------------------------------------
 
 ext_modules = [
-    # Pure Cython modules (no external C++ dependencies)
     Extension(
         "horayzon.transform",
         ["horayzon/transform.pyx"],
@@ -145,32 +130,27 @@ ext_modules = [
         extra_compile_args=extra_compile_args_cython,
         include_dirs=[np.get_include()],
     ),
+    Extension(
+        "horayzon.horizon",
+        sources=["horayzon/horizon.pyx", "horayzon/horizon_comp.cpp"],
+        include_dirs=include_dirs_cpp,
+        library_dirs=library_dirs,
+        libraries=libraries_cpp,
+        extra_compile_args=extra_compile_args_cpp,
+        extra_link_args=extra_link_args_cpp,
+        language="c++",
+    ),
+    Extension(
+        "horayzon.shadow",
+        sources=["horayzon/shadow.pyx", "horayzon/shadow_comp.cpp"],
+        include_dirs=include_dirs_cpp,
+        library_dirs=library_dirs,
+        libraries=libraries_cpp,
+        extra_compile_args=extra_compile_args_cpp,
+        extra_link_args=extra_link_args_cpp,
+        language="c++",
+    ),
 ]
-
-if not use_mingw:
-    # C++ modules with Embree and TBB dependencies (MSVC default)
-    ext_modules.extend([
-        Extension(
-            "horayzon.horizon",
-            sources=["horayzon/horizon.pyx", "horayzon/horizon_comp.cpp"],
-            include_dirs=include_dirs_cpp,
-            library_dirs=library_dirs,
-            libraries=libraries_cpp,
-            extra_compile_args=extra_compile_args_cpp,
-            extra_link_args=extra_link_args_cpp,
-            language="c++",
-        ),
-        Extension(
-            "horayzon.shadow",
-            sources=["horayzon/shadow.pyx", "horayzon/shadow_comp.cpp"],
-            include_dirs=include_dirs_cpp,
-            library_dirs=library_dirs,
-            libraries=libraries_cpp,
-            extra_compile_args=extra_compile_args_cpp,
-            extra_link_args=extra_link_args_cpp,
-            language="c++",
-        ),
-    ])
 
 setup(
     name="horayzon",
@@ -210,17 +190,16 @@ setup(
 
 output_dir = os.path.join(base_path, "horayzon_modul", "horayzon")
 
-# Clean and recreate output directory
 if os.path.exists(output_dir):
     shutil.rmtree(output_dir)
 os.makedirs(output_dir)
 
-# Copy compiled .pyd files from horayzon/
+# Copy compiled .pyd files
 for pyd_file in glob.glob(os.path.join(base_path, "horayzon", "*.pyd")):
     shutil.copy2(pyd_file, output_dir)
     print(f"  Copied: {os.path.basename(pyd_file)}")
 
-# Copy pure Python files from horayzon/
+# Copy pure Python files
 python_files = ["__init__.py", "auxiliary.py", "domain.py", "download.py",
                 "geoid.py", "load_dem.py", "ocean_masking.py"]
 for py_file in python_files:
@@ -229,20 +208,23 @@ for py_file in python_files:
         shutil.copy2(src, output_dir)
         print(f"  Copied: {py_file}")
 
-# Copy required DLLs into the module directory
-for dll_name in ["embree4.dll", "tbb12.dll"]:
-    dll_src = os.path.join(embree_bin_dir, dll_name)
+# Copy required DLLs (MSVC Embree + MinGW TBB + MinGW runtime)
+dll_sources = [
+    os.path.join(embree_bin_dir,      "embree4.dll"),
+    os.path.join(embree_bin_dir,      "tbb12.dll"),
+    r"C:\work\git\tbb-mingw\bin\libtbb12.dll",
+    r"C:\LegacySW\mingw64\bin\libgcc_s_seh-1.dll",
+    r"C:\LegacySW\mingw64\bin\libstdc++-6.dll",
+]
+for dll_src in dll_sources:
     if os.path.exists(dll_src):
         shutil.copy2(dll_src, output_dir)
-        print(f"  Copied: {dll_name}")
+        print(f"  Copied: {os.path.basename(dll_src)}")
     else:
-        print(f"  WARNING: {dll_name} not found at {dll_src}")
+        print(f"  WARNING: not found: {dll_src}")
 
 print("\n" + "=" * 60)
 print("BUILD COMPLETE")
 print("=" * 60)
 print(f"\nModule assembled in: {output_dir}")
-print("You can use it by adding the parent directory to your Python path:")
-print(f'  sys.path.insert(0, r"{os.path.join(base_path, "horayzon_modul")}")')
-print("  import horayzon")
 print("=" * 60)
