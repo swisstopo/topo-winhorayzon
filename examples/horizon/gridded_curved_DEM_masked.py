@@ -170,7 +170,7 @@ cbar.ax.set_yticks([-1.0, 0.0, 1.0])
 cbar.ax.set_yticklabels(["outside buffer", "buffer", "land"])
 cbar.ax.tick_params(rotation=90)
 cbar.ax.yaxis.set_tick_params(pad=10)
-fig.savefig(path_out + "Grid_cell_types.png", dpi=300, bbox_inches="tight")
+fig.savefig(os.path.join(path_out, "Grid_cell_types.png"), dpi=300, bbox_inches="tight")
 plt.close(fig)
 
 # Binary mask
