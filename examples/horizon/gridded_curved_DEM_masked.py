@@ -40,7 +40,7 @@ dem_res = 3.0 / 3600.0  # resolution of DEM [degree]
 # Paths and file names
 dem_file_url = "https://srtm.csi.cgiar.org/wp-content/uploads/files/" \
                + "srtm_30x30/TIFF/S60W060.zip"
-path_out = "/Users/csteger/Desktop/Output/"
+path_out = os.path.join(r"C:\\", "temp", "topo-winhorayzon")
 file_hori = "hori_SRTM_South_Georgia.nc"
 file_topo_par = "topo_par_SRTM_South_Georgia.nc"
 
@@ -50,21 +50,22 @@ file_topo_par = "topo_par_SRTM_South_Georgia.nc"
 
 # Check if output directory exists
 if not os.path.isdir(path_out):
-    raise FileNotFoundError("Output directory does not exist")
-path_out += "horizon/gridded_SRTM_South_Georgia/"
+    raise FileNotFoundError(f"Output directory {path_out} does not exist")
+path_out = os.path.join(path_out, "horizon", "gridded_SRTM_South_Georgia")
 if not os.path.isdir(path_out):
     os.makedirs(path_out)
 
-# Download and unzip SRTM tile (30 x 30 degree)
-print("Download SRTM tile (30 x 30 degree):")
-hray.download.file(dem_file_url, path_out)
-with zipfile.ZipFile(path_out + "S60W060.zip", "r") as zip_ref:
-    zip_ref.extractall(path_out + "S60W060")
-os.remove(path_out + "S60W060.zip")
+file_dem = os.path.join(path_out,"S60W060", "cut_s60w060.tif")
+if not os.path.isfile(file_dem):
+    # Download and unzip SRTM tile (30 x 30 degree)
+    print("Download SRTM tile (30 x 30 degree):")
+    hray.download.file(dem_file_url, path_out)
+    with zipfile.ZipFile(path_out + "S60W060.zip", "r") as zip_ref:
+        zip_ref.extractall(path_out + "S60W060")
+    os.remove(path_out + "S60W060.zip")
 
 # Load required DEM data (including outer boundary zone)
 domain_outer = hray.domain.curved_grid(domain, dist_search, ellps)
-file_dem = path_out + "S60W060/cut_s60w060.tif"
 lon, lat, elevation = hray.load_dem.srtm(file_dem, domain_outer, engine="gdal")
 mask_land_dem = (elevation != -32768.0)
 
