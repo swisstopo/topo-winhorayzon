@@ -31,7 +31,7 @@ ellps = "WGS84"  # Earth's surface approximation (sphere, GRS80 or WGS84)
 # Paths and file names
 dem_file_url = "https://data.pgc.umn.edu/elev/dem/setsm/REMA/mosaic/" \
                + "v1.1/100m/REMA_100m_peninsula_dem_filled.tif"
-path_out = "/Users/csteger/Desktop/Output/"
+path_out = os.path.join(r"C:\\", "temp", "topo-winhorayzon")
 file_sw_dir_cor = "sw_dir_cor_REMA_Antarctica.nc"
 
 # -----------------------------------------------------------------------------
@@ -41,17 +41,19 @@ file_sw_dir_cor = "sw_dir_cor_REMA_Antarctica.nc"
 # Check if output directory exists
 if not os.path.isdir(path_out):
     raise FileNotFoundError("Output directory does not exist")
-path_out += "shadow/gridded_REMA_Antarctica/"
+path_out = os.path.join(path_out, "shadow", "gridded_REMA_Antarctica")
 if not os.path.isdir(path_out):
     os.makedirs(path_out)
 
 # Download REMA tile for Antarctic Peninsula
-print("Download REMA tile for Antarctic Peninsula:")
-hray.download.file(dem_file_url, path_out)
+file_dem = os.path.join(path_out, "REMA_100m_peninsula_dem_filled.tif")
+if not os.path.isfile(file_dem):
+    print("Download REMA tile for Antarctic Peninsula:")
+    hray.download.file(dem_file_url, path_out)
 
 # Load required DEM data (including outer boundary zone)
 domain_outer = hray.domain.planar_grid(domain, dist_search)
-file_dem = path_out + "REMA_100m_peninsula_dem_filled.tif"
+
 x, y, elevation = hray.load_dem.rema(file_dem, domain_outer, engine="pillow")
 # -> GeoTIFF can also be read with GDAL if available (-> faster)
 # -> elevation is referenced to WGS84 ellipsoid
@@ -150,7 +152,7 @@ ta = [time_dt_beg + dt_step * i for i in range(num_ts)]
 # -----------------------------------------------------------------------------
 
 # Loop through time steps and save data to NetCDF file
-ncfile = Dataset(filename=path_out + file_sw_dir_cor, mode="w")
+ncfile = Dataset(filename=os.path.join(path_out, file_sw_dir_cor), mode="w")
 ncfile.createDimension(dimname="time", size=None)
 ncfile.createDimension(dimname="y", size=dim_in_0)
 ncfile.createDimension(dimname="x", size=dim_in_1)
@@ -188,7 +190,7 @@ for i in range(len(ta)):
 
     comp_time_shadow.append((time.time() - t_beg))
 
-    ncfile = Dataset(filename=path_out + file_sw_dir_cor, mode="a")
+    ncfile = Dataset(filename=os.path.join(path_out, file_sw_dir_cor), mode="a")
     nc_time = ncfile.variables["time"]
     nc_time[i] = date2num(ta[i], units=nc_time.units,
                           calendar=nc_time.calendar)
@@ -227,7 +229,7 @@ fields = {"elevation": {"array": elevation_in, "datatype": "f",
           "surf_enl_fac": {"array": surf_enl_fac, "datatype": "f",
                            "long_name": "surface enlargement factor",
                            "units": "-"}}
-ncfile = Dataset(filename=path_out + file_sw_dir_cor, mode="a")
+ncfile = Dataset(filename=os.path.join(path_out, file_sw_dir_cor), mode="a")
 for i in fields:
     nc_data = ncfile.createVariable(varname=i, datatype=fields[i]["datatype"],
                                     dimensions=("y", "x"))
