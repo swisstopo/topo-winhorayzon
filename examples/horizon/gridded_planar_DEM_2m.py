@@ -44,7 +44,7 @@ hmm_ex = "/Applications/hmm/bin/hmm"
 dem_file_url = "https://data.geo.admin.ch/ch.swisstopo.swissalti3d/" \
                + "swissalti3d_yyyy_eeee-nnnn/" \
                + "swissalti3d_yyyy_eeee-nnnn_2_2056_5728.tif"
-path_out = "/Users/csteger/Desktop/Output/"
+path_out = os.path.join(r"C:\\", "temp", "topo-winhorayzon")
 file_hori = "hori_swissALTI3D_Switzerland.nc"
 file_topo_par = "topo_par_swissALTI3D_Switzerland.nc"
 
@@ -59,7 +59,7 @@ if (domain_out_frac_simp < 0.0) or (domain_out_frac_simp > 1.0):
 # Check if output directory exists
 if not os.path.isdir(path_out):
     raise ValueError("Output directory does not exist")
-path_out += "horizon/gridded_swissALTI3D_Switzerland/"
+path_out = os.path.join(path_out, "horizon", "gridded_swissALTI3D_Switzerland")
 if not os.path.isdir(path_out):
     os.makedirs(path_out)
 
