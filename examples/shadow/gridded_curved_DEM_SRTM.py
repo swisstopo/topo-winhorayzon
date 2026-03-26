@@ -45,9 +45,10 @@ ellps = "WGS84"  # Earth's surface approximation (sphere, GRS80 or WGS84)
 # Paths and file names
 dem_file_url = "https://srtm.csi.cgiar.org/wp-content/uploads/files/" \
                + "srtm_30x30/TIFF/S60W060.zip"
-path_out = "/Users/csteger/Desktop/Output/"
+path_out = os.path.join(r"C:\\", "temp", "topo-winhorayzon")
 file_shadow = "shadow_SRTM_South_Georgia.nc"
 file_sw_dir_cor = "sw_dir_cor_SRTM_South_Georgia.nc"
+path_to_aux_data = r"C:\temp/"
 
 # -----------------------------------------------------------------------------
 # Prepare data and initialise Terrain class
@@ -56,20 +57,22 @@ file_sw_dir_cor = "sw_dir_cor_SRTM_South_Georgia.nc"
 # Check if output directory exists
 if not os.path.isdir(path_out):
     raise FileNotFoundError("Output directory does not exist")
-path_out += "shadow/gridded_SRTM_South_Georgia/"
+path_out = os.path.join(path_out, "shadow", "gridded_SRTM_South_Georgia")
 if not os.path.isdir(path_out):
     os.makedirs(path_out)
 
 # Download and unzip SRTM tile (30 x 30 degree)
-print("Download SRTM tile (30 x 30 degree):")
-hray.download.file(dem_file_url, path_out)
-with zipfile.ZipFile(path_out + "S60W060.zip", "r") as zip_ref:
-    zip_ref.extractall(path_out + "S60W060")
-os.remove(path_out + "S60W060.zip")
+file_dem = os.path.join(path_out, "S60W060", "cut_s60w060.tif")
+if not os.path.isfile(file_dem):
+    print("Download SRTM tile (30 x 30 degree):")
+    hray.download.file(dem_file_url, path_out)
+    with zipfile.ZipFile(path_out + "S60W060.zip", "r") as zip_ref:
+        zip_ref.extractall(path_out + "S60W060")
+    os.remove(path_out + "S60W060.zip")
 
 # Load required DEM data (including outer boundary zone)
 domain_outer = hray.domain.curved_grid(domain, dist_search, ellps)
-file_dem = path_out + "S60W060/cut_s60w060.tif"
+
 lon, lat, elevation = hray.load_dem.srtm(file_dem, domain_outer,
                                          engine="pillow")
 # -> GeoTIFF can also be read with GDAL if available (-> faster)
@@ -88,7 +91,7 @@ elevation_ortho = np.ascontiguousarray(elevation[slice_in])
 # orthometric height (-> height above mean sea level)
 
 # Compute ellipsoidal heights
-elevation += hray.geoid.undulation(lon, lat, geoid="EGM96")  # [m]
+elevation += hray.geoid.undulation(lon, lat, geoid="EGM96", path_to_aux_data=path_to_aux_data)  # [m]
 
 # Compute ECEF coordinates
 x_ecef, y_ecef, z_ecef = hray.transform.lonlat2ecef(*np.meshgrid(lon, lat),
@@ -163,7 +166,7 @@ ta = [time_dt_beg + dt_step * i for i in range(num_ts)]
 # -----------------------------------------------------------------------------
 
 # Loop through time steps and save data to NetCDF file
-ncfile = Dataset(filename=path_out + file_shadow, mode="w")
+ncfile = Dataset(filename=os.path.join(path_out, file_shadow), mode="w")
 ncfile.createDimension(dimname="time", size=None)
 ncfile.createDimension(dimname="lat", size=dim_in_0)
 ncfile.createDimension(dimname="lon", size=dim_in_1)
@@ -204,7 +207,7 @@ for i in range(len(ta)):
 
     comp_time_shadow.append((time.time() - t_beg))
 
-    ncfile = Dataset(filename=path_out + file_shadow, mode="a")
+    ncfile = Dataset(filename=os.path.join(path_out, file_shadow), mode="a")
     nc_time = ncfile.variables["time"]
     nc_time[i] = date2num(ta[i], units=nc_time.units,
                           calendar=nc_time.calendar)
@@ -217,7 +220,7 @@ for i in range(len(ta)):
 # -----------------------------------------------------------------------------
 
 # Loop through time steps and save data to NetCDF file
-ncfile = Dataset(filename=path_out + file_sw_dir_cor, mode="w")
+ncfile = Dataset(filename=os.path.join(path_out, file_sw_dir_cor), mode="w")
 ncfile.createDimension(dimname="time", size=None)
 ncfile.createDimension(dimname="lat", size=dim_in_0)
 ncfile.createDimension(dimname="lon", size=dim_in_1)
@@ -257,7 +260,7 @@ for i in range(len(ta)):
 
     comp_time_sw_dir_cor.append((time.time() - t_beg))
 
-    ncfile = Dataset(filename=path_out + file_sw_dir_cor, mode="a")
+    ncfile = Dataset(filename=os.path.join(path_out, file_sw_dir_cor), mode="a")
     nc_time = ncfile.variables["time"]
     nc_time[i] = date2num(ta[i], units=nc_time.units,
                           calendar=nc_time.calendar)
@@ -280,11 +283,11 @@ plt.ylabel("Computing time [seconds]")
 plt.legend(loc="upper center", frameon=False, fontsize=11)
 plt.title("Terrain size (" + str(dim_in_0) + " x " + str(dim_in_1) + ")",
           fontweight="bold", fontsize=12)
-fig.savefig(path_out + "Performance.png", dpi=300, bbox_inches="tight")
+fig.savefig(os.path.join(path_out, "Performance.png"), dpi=300, bbox_inches="tight")
 plt.close(fig)
 
 # Check spatial mean of correction factor
-ds = xr.open_dataset(path_out + file_sw_dir_cor)
+ds = xr.open_dataset(os.path.join(path_out, file_sw_dir_cor))
 sw_dir_cor = ds["sw_dir_cor"].values
 ds.close()
 
@@ -294,7 +297,7 @@ for i in (0.0, 1.0):
 plt.plot(ta, sw_dir_cor.mean(axis=(1, 2)), lw=1.5, color="blue")
 plt.ylim([-0.1, 1.1])
 plt.ylabel("Spatial mean of correction factor [-]")
-fig.savefig(path_out + "SW_dir_cor_spatial_mean.png", dpi=300,
+fig.savefig(os.path.join(path_out, "SW_dir_cor_spatial_mean.png"), dpi=300,
             bbox_inches="tight")
 plt.close(fig)
 
@@ -306,7 +309,7 @@ del sw_dir_cor
 
 # Load data
 ind = 10  # select time step
-ds = xr.open_dataset(path_out + file_sw_dir_cor)
+ds = xr.open_dataset(os.path.join(path_out, file_sw_dir_cor))
 sw_dir_cor = ds["sw_dir_cor"][ind, :, :].values
 ds.close()
 
@@ -351,7 +354,7 @@ t.set_bbox(dict(facecolor="white", alpha=0.8, edgecolor="none"))
 ts = load.timescale()
 astrometric = loc_or.at(ts.from_datetime(ta[ind])).observe(sun)
 alt, az, d = astrometric.apparent().altaz()
-txt = "Mean solar elevation angle: %.1f" % alt.degrees + "$^{\circ}$"
+txt = "Mean solar elevation angle: %.1f" % alt.degrees + "$^{\\circ}$"
 t = plt.text(0.21, 0.06, txt, fontsize=11, fontweight="bold",
              horizontalalignment="center", verticalalignment="center",
              transform=ax.transAxes)
@@ -359,7 +362,7 @@ t.set_bbox(dict(facecolor="white", alpha=0.8, edgecolor="none"))
 ax = plt.subplot(gs[1, 1])
 mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, ticks=ticks,
                           orientation="vertical")
-plt.ylabel("${\downarrow}SW_{dir}$ correction factor [-]", labelpad=10.0)
-fig.savefig(path_out + "Elevation_sw_dir_cor.png", dpi=300,
+plt.ylabel("${\\downarrow}SW_{dir}$ correction factor [-]", labelpad=10.0)
+fig.savefig(os.path.join(path_out, "Elevation_sw_dir_cor.png"), dpi=300,
             bbox_inches="tight")
 plt.close(fig)

@@ -1,0 +1,10 @@
+*.pyd
+*.c
+*.cpp
+__pycache__
+/build/
+/embree/
+/tbb/
+/whl/
+/horayzon_modul/
+

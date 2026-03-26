@@ -24,7 +24,7 @@ dom_width_h = np.array([10000, 20000, 10000], dtype=np.float32)  # [m]
 dx, dy = 100, 100  # [m]
 
 # Paths and file names
-path_out = "/Users/csteger/Desktop/Output/"
+path_out = os.path.join(r"C:\\", "temp", "topo-winhorayzon")
 file_sw_dir_cor = "sw_dir_cor_artificial.nc"
 
 # -----------------------------------------------------------------------------
@@ -38,7 +38,7 @@ if ((not np.all(dom_width_h % dx == 0.0))
 # Check if output directory exists
 if not os.path.isdir(path_out):
     raise FileNotFoundError("Output directory does not exist")
-path_out += "shadow/gridded_artificial/"
+path_out = os.path.join(path_out, "shadow", "gridded_artificial")
 if not os.path.isdir(path_out):
     os.makedirs(path_out)
 
@@ -124,7 +124,7 @@ if dist_sun < dist_min:
     raise ValueError("Distance to sun is too small")
 
 # Loop through different azimuth angles and save data to NetCDF file
-ncfile = Dataset(filename=path_out + file_sw_dir_cor, mode="w")
+ncfile = Dataset(filename=os.path.join(path_out, file_sw_dir_cor), mode="w")
 ncfile.createDimension(dimname="azim", size=None)
 ncfile.createDimension(dimname="y", size=dim_in_0)
 ncfile.createDimension(dimname="x", size=dim_in_1)
@@ -151,7 +151,7 @@ for i in range(len(azim)):
     sun_position = np.array([x_sun, y_sun, z_sun], dtype=np.float32)
     terrain.sw_dir_cor(sun_position, sw_dir_cor)
 
-    ncfile = Dataset(filename=path_out + file_sw_dir_cor, mode="a")
+    ncfile = Dataset(filename=os.path.join(path_out, file_sw_dir_cor), mode="a")
     nc_azim = ncfile.variables["azim"]
     nc_azim[i] = np.rad2deg(azim[i])
     nc_data = ncfile.variables["sw_dir_cor"]
@@ -173,7 +173,7 @@ fields = {"elevation": {"array": elevation_in, "datatype": "f",
           "surf_enl_fac": {"array": surf_enl_fac, "datatype": "f",
                            "long_name": "surface enlargement factor",
                            "units": "-"}}
-ncfile = Dataset(filename=path_out + file_sw_dir_cor, mode="a")
+ncfile = Dataset(filename=os.path.join(path_out, file_sw_dir_cor), mode="a")
 for i in fields:
     nc_data = ncfile.createVariable(varname=i, datatype=fields[i]["datatype"],
                                     dimensions=("y", "x"))
@@ -187,7 +187,7 @@ ncfile.close()
 # -----------------------------------------------------------------------------
 
 # Check spatial mean of correction factor
-ds = xr.open_dataset(path_out + file_sw_dir_cor)
+ds = xr.open_dataset(os.path.join(path_out, file_sw_dir_cor))
 azim = ds["azim"].values
 sw_dir_cor = ds["sw_dir_cor"].values.mean(axis=(1, 2))
 ds.close()
@@ -199,6 +199,6 @@ plt.axis((azim[0] - 5.0, azim[-1] + 5.0, 0.85, 1.05))
 plt.xlabel("Azimuth angle (measured clockwise from North) [degree]")
 plt.ylabel("Spatial mean of correction factor [-]")
 plt.title("Average: %.3f" % sw_dir_cor.mean(), fontsize=12)
-fig.savefig(path_out + "SW_dir_cor_spatial_mean.png", dpi=300,
+fig.savefig(os.path.join(path_out + "SW_dir_cor_spatial_mean.png"), dpi=300,
             bbox_inches="tight")
 plt.close(fig)

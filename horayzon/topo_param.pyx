@@ -8,8 +8,46 @@ import numpy as np
 from libc.math cimport sin, cos, sqrt, atan
 from libc.math cimport M_PI
 from libc.math cimport NAN
-from libc.stdio cimport printf
-from scipy.linalg.cython_lapack cimport sgesv
+
+
+cdef bint _solve_3x3(float[:, :] A, float[:] b, float[:] x):
+    """Solve A*x = b for 3x3 matrix A and 3-vector b in-place into x."""
+    cdef float a00 = A[0, 0]
+    cdef float a01 = A[0, 1]
+    cdef float a02 = A[0, 2]
+    cdef float a10 = A[1, 0]
+    cdef float a11 = A[1, 1]
+    cdef float a12 = A[1, 2]
+    cdef float a20 = A[2, 0]
+    cdef float a21 = A[2, 1]
+    cdef float a22 = A[2, 2]
+    cdef float det
+    cdef float inv00, inv01, inv02
+    cdef float inv10, inv11, inv12
+    cdef float inv20, inv21, inv22
+
+    det = (a00 * (a11 * a22 - a12 * a21)
+           - a01 * (a10 * a22 - a12 * a20)
+           + a02 * (a10 * a21 - a11 * a20))
+    if abs(det) < 1e-12:
+        return False
+
+    inv00 = (a11 * a22 - a12 * a21) / det
+    inv01 = (a02 * a21 - a01 * a22) / det
+    inv02 = (a01 * a12 - a02 * a11) / det
+
+    inv10 = (a12 * a20 - a10 * a22) / det
+    inv11 = (a00 * a22 - a02 * a20) / det
+    inv12 = (a02 * a10 - a00 * a12) / det
+
+    inv20 = (a10 * a21 - a11 * a20) / det
+    inv21 = (a01 * a20 - a00 * a21) / det
+    inv22 = (a00 * a11 - a01 * a10) / det
+
+    x[0] = inv00 * b[0] + inv01 * b[1] + inv02 * b[2]
+    x[1] = inv10 * b[0] + inv11 * b[1] + inv12 * b[2]
+    x[2] = inv20 * b[0] + inv21 * b[1] + inv22 * b[2]
+    return True
 
 
 # -----------------------------------------------------------------------------
@@ -75,9 +113,6 @@ def slope_plane_meth(x, y, z, rot_mat=None, output_rot=False):
     if rot_mat is None:
         rot_mat = np.empty(x.shape + (3, 3), dtype=np.float32)
         rot_mat[...,:,:] = np.eye(3, dtype=np.float32)
-        print("No rotation matrices provided, use identity matrices")
-        print(np.eye(3, dtype=np.float32))
-        print("that cause no rotation")
     vec_tilt = _slope_plane_meth_cy(x, y, z, rot_mat, output_rot)
     return vec_tilt
 
@@ -109,6 +144,9 @@ def _slope_plane_meth_cy(float[:, :] x, float[:, :] y, float[:, :] z,
     cdef float[:] mat = np.zeros(9, dtype=np.float32)
     cdef int[:] ipiv = np.empty(3, dtype=np.int32)
     cdef float[:, :] coord = np.empty((9, 3), dtype=np.float32)
+    cdef float[:, :] A = np.empty((3, 3), dtype=np.float32)
+    cdef float[:] rhs = np.empty(3, dtype=np.float32)
+    cdef float[:] sol = np.empty(3, dtype=np.float32)
 
     # Settings for solving system of linear equations
     num = 3 # number of linear equations [-]
@@ -176,8 +214,21 @@ def _slope_plane_meth_cy(float[:, :] x, float[:, :] y, float[:, :] z,
             vec[0] = x_l_z_l_sum
             vec[1] = y_l_z_l_sum
             vec[2] = z_l_sum
-            sgesv(&num, &nrhs, &mat[0], &lda, &ipiv[0], &vec[0], &ldb,
-                  &info)
+
+            # Solve 3x3 linear system without LAPACK dependency
+            A[0, 0] = mat[0]; A[1, 0] = mat[1]; A[2, 0] = mat[2]
+            A[0, 1] = mat[3]; A[1, 1] = mat[4]; A[2, 1] = mat[5]
+            A[0, 2] = mat[6]; A[1, 2] = mat[7]; A[2, 2] = mat[8]
+            rhs[0] = vec[0]; rhs[1] = vec[1]; rhs[2] = vec[2]
+            if not _solve_3x3(A, rhs, sol):
+                vec[0] = 0.0
+                vec[1] = 0.0
+                vec[2] = -1.0
+            else:
+                vec[0] = sol[0]
+                vec[1] = sol[1]
+                vec[2] = sol[2]
+
             vec[2] = -1.0
 
             vec_x = vec[0]
@@ -201,10 +252,7 @@ def _slope_plane_meth_cy(float[:, :] x, float[:, :] y, float[:, :] z,
             vec_tilt[i, j, 2] = vec_z
 
     # Rotate output vectors
-    if output_rot:
-        printf("Tilted surface normals are rotated according to 'rot_mat'\n")
-    else:
-
+    if not output_rot:
         # Rotate vector back to input reference frame (-> use transposes of
         # rotation matrices)
         for i in range(1, (len_0 - 1)):
@@ -352,8 +400,6 @@ def _slope_vector_meth_cy(float[:, :] x, float[:, :] y, float[:, :] z,
 
     # Rotate output vectors
     if output_rot:
-        printf("Tilted surface normals are rotated according to 'rot_mat'\n")
-
         for i in range(1, (len_0 - 1)):
             for j in range(1, (len_1 - 1)):
                 vec_x = rot_mat[i, j, 0, 0] * vec_tilt[i, j, 0] \

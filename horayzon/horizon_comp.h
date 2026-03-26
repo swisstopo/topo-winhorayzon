@@ -4,8 +4,10 @@
 #ifndef TESTLIB_H
 #define TESTLIB_H
 
+#include <cstdint>  // for uint8_t (Windows compatibility)
+
 // Compute horizon for gridded domain
-void horizon_gridded_comp(float* vert_grid, 
+void horizon_gridded_comp(float* vert_grid,
 	int dem_dim_0, int dem_dim_1,
 	float* vec_norm, float* vec_north,
 	int offset_0, int offset_1,

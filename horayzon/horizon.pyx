@@ -21,9 +21,9 @@ cdef extern from "horizon_comp.h":
             int azim_num, float dist_search,
             float hori_acc, char* ray_algorithm, char* geom_type,
             float* vert_simp, int num_vert_simp,
-            np.npy_int32* tri_ind_simp, int num_tri_simp,
+            int* tri_ind_simp, int num_tri_simp,
             float elev_ang_low_lim,
-            np.npy_uint8* mask, float hori_fill,
+            unsigned char* mask, float hori_fill,
             float ray_org_elev)
 
 def horizon_gridded(
@@ -182,7 +182,7 @@ def horizon_gridded(
         azim_num, dist_search,
         hori_acc, ray_algorithm_c, geom_type_c,
         &vert_simp[0], num_vert_simp,
-        &tri_ind_simp[0], num_tri_simp,
+        <int*>&tri_ind_simp[0], num_tri_simp,
         elev_ang_low_lim,
         &mask[0,0], hori_fill,
         ray_org_elev)

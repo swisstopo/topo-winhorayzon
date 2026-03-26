@@ -35,9 +35,10 @@ azim_num = 360  # number of azimuth sampling directions [-]
 # Paths and file names
 dem_file_url = "https://srtm.csi.cgiar.org/wp-content/uploads/files/" \
                + "srtm_5x5/TIFF/srtm_38_03.zip"
-path_out = "/Users/csteger/Desktop/Output/"
+path_out = os.path.join(r"C:\\", "temp", "topo-winhorayzon")
 file_hori = "hori_SRTM_Alps.nc"
 file_topo_par = "topo_par_SRTM_Alps.nc"
+path_to_aux_data = r"C:\temp/"
 
 # -----------------------------------------------------------------------------
 # Compute and save topographic parameters
@@ -46,26 +47,27 @@ file_topo_par = "topo_par_SRTM_Alps.nc"
 # Check if output directory exists
 if not os.path.isdir(path_out):
     raise FileNotFoundError("Output directory does not exist")
-path_out += "horizon/gridded_SRTM_Alps/"
+path_out = os.path.join(path_out, "horizon", "gridded_SRTM_Alps")
 if not os.path.isdir(path_out):
     os.makedirs(path_out)
 
 # Download and unzip SRTM tile (5 x 5 degree)
-print("Download SRTM tile (5 x 5 degree):")
-hray.download.file(dem_file_url, path_out)
-with zipfile.ZipFile(path_out + "srtm_38_03.zip", "r") as zip_ref:
-    zip_ref.extractall(path_out + "srtm_38_03")
-os.remove(path_out + "srtm_38_03.zip")
+file_dem = os.path.join(path_out,"srtm_38_03", "srtm_38_03.tif")
+if not os.path.isfile(file_dem):
+    print("Download SRTM tile (5 x 5 degree):")
+    hray.download.file(dem_file_url, path_out)
+    with zipfile.ZipFile(path_out + "srtm_38_03.zip", "r") as zip_ref:
+        zip_ref.extractall(path_out + "srtm_38_03")
+    os.remove(path_out + "srtm_38_03.zip")
 
 # Load required DEM data (including outer boundary zone)
 domain_outer = hray.domain.curved_grid(domain, dist_search, ellps)
-file_dem = path_out + "srtm_38_03/srtm_38_03.tif"
 lon, lat, elevation = hray.load_dem.srtm(file_dem, domain_outer,
                                          engine="pillow")
 # -> GeoTIFF can also be read with GDAL if available (-> faster)
 
 # Compute ellipsoidal heights
-elevation += hray.geoid.undulation(lon, lat, geoid="EGM96")  # [m]
+elevation += hray.geoid.undulation(lon, lat, geoid="EGM96", path_to_aux_data=path_to_aux_data)  # [m]
 
 # Compute indices of inner domain
 slice_in = (slice(np.where(lat >= domain["lat_max"])[0][-1],
@@ -122,7 +124,7 @@ ds = xr.Dataset(
     )
 )
 encoding = {i: {"_FillValue": None} for i in ("azim", "lat", "lon")}
-ds.to_netcdf(path_out + file_hori, encoding=encoding)
+ds.to_netcdf(os.path.join(path_out, file_hori), encoding=encoding)
 
 # Compute rotation matrix (global ENU -> local ENU)
 rot_mat_glob2loc = hray.transform.rotation_matrix_glob2loc(vec_north_enu,
@@ -169,7 +171,7 @@ ds = xr.Dataset(
 )
 encoding = {i: {"_FillValue": None} for i in
             ("lat", "lon", "elevation", "slope", "aspect")}
-ds.to_netcdf(path_out + file_topo_par, encoding=encoding)
+ds.to_netcdf(os.path.join(path_out, file_topo_par), encoding=encoding)
 
 # -----------------------------------------------------------------------------
 # Plot topographic parameters
@@ -235,5 +237,5 @@ for i in list(data_plot.keys()):
     cb = mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm,
                                    orientation="horizontal")
     # -------------------------------------------------------------------------
-fig.savefig(path_out + "Topo_slope_SVF.png", dpi=300, bbox_inches="tight")
+fig.savefig(os.path.join(path_out, "Topo_slope_SVF.png"), dpi=300, bbox_inches="tight")
 plt.close(fig)

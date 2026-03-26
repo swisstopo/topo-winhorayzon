@@ -29,7 +29,7 @@ azim_num = 180  # number of azimuth sampling directions [-]
 # Paths and file names
 dem_file_url = "https://cms.geo.admin.ch/ogd/topography/" \
                + "DHM25_MM_ASCII_GRID.zip"
-path_out = "/Users/csteger/Desktop/Output/"
+path_out = os.path.join(r"C:\\", "temp", "topo-winhorayzon")
 file_hori = "hori_DHM25_Switzerland.nc"
 file_topo_par = "topo_par_DHM25_Switzerland.nc"
 
@@ -40,20 +40,22 @@ file_topo_par = "topo_par_DHM25_Switzerland.nc"
 # Check if output directory exists
 if not os.path.isdir(path_out):
     raise ValueError("Output directory does not exist")
-path_out += "horizon/gridded_DHM25_Switzerland/"
+path_out = os.path.join(path_out, "horizon", "gridded_DHM25_Switzerland")
 if not os.path.isdir(path_out):
     os.makedirs(path_out)
 
 # Download and unzip DHM25 data
 print("Download DHM25 data:")
-hray.download.file(dem_file_url, path_out)
-with zipfile.ZipFile(path_out + "DHM25_MM_ASCII_GRID.zip", "r") as zip_ref:
-    zip_ref.extractall(path_out)
-os.remove(path_out + "DHM25_MM_ASCII_GRID.zip")
+file_dem = os.path.join(path_out,"ASCII_GRID_1part", "dhm25_grid_raster.asc")
+if not os.path.isfile(file_dem):
+    hray.download.file(dem_file_url, path_out)
+    with zipfile.ZipFile(path_out + "DHM25_MM_ASCII_GRID.zip", "r") as zip_ref:
+        zip_ref.extractall(path_out)
+    os.remove(path_out + "DHM25_MM_ASCII_GRID.zip")
 
 # Load required DEM data (including outer boundary zone)
 domain_outer = hray.domain.planar_grid(domain, dist_search)
-file_dem = path_out + "ASCII_GRID_1part/dhm25_grid_raster.asc"
+
 x, y, elevation = hray.load_dem.dhm25(file_dem, domain_outer, engine="numpy")
 # -> ESRI ASCII GRID file can also be read with GDAL if available (-> faster)
 
@@ -97,7 +99,7 @@ ds = xr.Dataset(
     )
 )
 encoding = {i: {"_FillValue": None} for i in ("azim", "y", "x")}
-ds.to_netcdf(path_out + file_hori, encoding=encoding)
+ds.to_netcdf(os.path.join(path_out, file_hori), encoding=encoding)
 
 # Compute slope
 x_2d, y_2d = np.meshgrid(x, y)
@@ -137,4 +139,4 @@ ds = xr.Dataset(
 )
 encoding = {i: {"_FillValue": None} for i in
             ("y", "x", "elevation", "slope", "aspect")}
-ds.to_netcdf(path_out + file_topo_par, encoding=encoding)
+ds.to_netcdf(os.path.join(path_out, file_topo_par), encoding=encoding)

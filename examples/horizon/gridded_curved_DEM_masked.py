@@ -19,10 +19,12 @@ import zipfile
 from shapely.ops import unary_union
 from rasterio.features import rasterize
 from rasterio.transform import Affine
+from osgeo import gdal
 import horayzon as hray
 import horayzon.ocean_masking as ocean_masking
 
 mpl.style.use("classic")
+gdal.UseExceptions()
 
 # -----------------------------------------------------------------------------
 # Settings
@@ -40,9 +42,10 @@ dem_res = 3.0 / 3600.0  # resolution of DEM [degree]
 # Paths and file names
 dem_file_url = "https://srtm.csi.cgiar.org/wp-content/uploads/files/" \
                + "srtm_30x30/TIFF/S60W060.zip"
-path_out = "/Users/csteger/Desktop/Output/"
+path_out = os.path.join(r"C:\\", "temp", "topo-winhorayzon")
 file_hori = "hori_SRTM_South_Georgia.nc"
 file_topo_par = "topo_par_SRTM_South_Georgia.nc"
+path_to_aux_data = r"C:\temp/"
 
 # -----------------------------------------------------------------------------
 # Compute and save topographic parameters
@@ -50,21 +53,22 @@ file_topo_par = "topo_par_SRTM_South_Georgia.nc"
 
 # Check if output directory exists
 if not os.path.isdir(path_out):
-    raise FileNotFoundError("Output directory does not exist")
-path_out += "horizon/gridded_SRTM_South_Georgia/"
+    raise FileNotFoundError(f"Output directory {path_out} does not exist")
+path_out = os.path.join(path_out, "horizon", "gridded_SRTM_South_Georgia")
 if not os.path.isdir(path_out):
     os.makedirs(path_out)
 
-# Download and unzip SRTM tile (30 x 30 degree)
-print("Download SRTM tile (30 x 30 degree):")
-hray.download.file(dem_file_url, path_out)
-with zipfile.ZipFile(path_out + "S60W060.zip", "r") as zip_ref:
-    zip_ref.extractall(path_out + "S60W060")
-os.remove(path_out + "S60W060.zip")
+file_dem = os.path.join(path_out,"S60W060", "cut_s60w060.tif")
+if not os.path.isfile(file_dem):
+    # Download and unzip SRTM tile (30 x 30 degree)
+    print("Download SRTM tile (30 x 30 degree):")
+    hray.download.file(dem_file_url, path_out)
+    with zipfile.ZipFile(path_out + "S60W060.zip", "r") as zip_ref:
+        zip_ref.extractall(path_out + "S60W060")
+    os.remove(path_out + "S60W060.zip")
 
 # Load required DEM data (including outer boundary zone)
 domain_outer = hray.domain.curved_grid(domain, dist_search, ellps)
-file_dem = path_out + "S60W060/cut_s60w060.tif"
 lon, lat, elevation = hray.load_dem.srtm(file_dem, domain_outer, engine="gdal")
 mask_land_dem = (elevation != -32768.0)
 
@@ -72,7 +76,7 @@ mask_land_dem = (elevation != -32768.0)
 elevation[~mask_land_dem] = 0.0
 
 # Compute ellipsoidal heights
-elevation += hray.geoid.undulation(lon, lat, geoid="EGM96")  # [m]
+elevation += hray.geoid.undulation(lon, lat, geoid="EGM96", path_to_aux_data=path_to_aux_data)  # [m]
 
 # Compute indices of inner domain
 slice_in = (slice(np.where(lat >= domain["lat_max"])[0][-1],
@@ -166,7 +170,7 @@ cbar.ax.set_yticks([-1.0, 0.0, 1.0])
 cbar.ax.set_yticklabels(["outside buffer", "buffer", "land"])
 cbar.ax.tick_params(rotation=90)
 cbar.ax.yaxis.set_tick_params(pad=10)
-fig.savefig(path_out + "Grid_cell_types.png", dpi=300, bbox_inches="tight")
+fig.savefig(os.path.join(path_out, "Grid_cell_types.png"), dpi=300, bbox_inches="tight")
 plt.close(fig)
 
 # Binary mask
@@ -197,7 +201,7 @@ ds = xr.Dataset(
     )
 )
 encoding = {i: {"_FillValue": None} for i in ("azim", "lat", "lon")}
-ds.to_netcdf(path_out + file_hori, encoding=encoding)
+ds.to_netcdf(os.path.join(path_out, file_hori), encoding=encoding)
 
 # Compute rotation matrix (global ENU -> local ENU)
 rot_mat_glob2loc = hray.transform.rotation_matrix_glob2loc(vec_north_enu,
@@ -244,4 +248,4 @@ ds = xr.Dataset(
 )
 encoding = {i: {"_FillValue": None} for i in
             ("lat", "lon", "elevation", "slope", "aspect")}
-ds.to_netcdf(path_out + file_topo_par, encoding=encoding)
+ds.to_netcdf(os.path.join(path_out, file_topo_par), encoding=encoding)
