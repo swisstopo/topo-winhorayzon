@@ -187,10 +187,12 @@ for i in list(loc_sel.keys()):
     # Bilinear interpolation of slope at location
     vec_tilt_ip = np.empty((1, 1, 3), dtype=np.float32)
     for j in range(3):
-        f = interpolate.interp2d(*np.meshgrid(lon[slice_3x3[1]],
-                                              lat[slice_3x3[0]]),
-                                 vec_tilt[:, :, j], bounds_error=True)
-        vec_tilt_ip[0, 0, j] = f(loc_sel[i][1], loc_sel[i][0])
+        f = interpolate.RegularGridInterpolator(
+            (lat[slice_3x3[0]], lon[slice_3x3[1]]),
+            vec_tilt[:, :, j], 
+            method="linear", 
+            bounds_error=True)
+        vec_tilt_ip[0, 0, j] = f([[loc_sel[i][0], loc_sel[i][1]]])[0]
     vec_tilt_ip /= np.sqrt(np.sum(vec_tilt_ip ** 2))  # unit vector
 
     # Compute slope angle and aspect
@@ -231,5 +233,5 @@ for i in list(loc_sel.keys()):
             "$^{\\circ}$, slope aspect: %.1f" % topo_param[i]["slope_aspect"] \
             + "$^{\\circ}$, SVF: %.2f" % topo_param[i]["svf"]
     plt.title(title, fontsize=12, loc="right")
-    fig.savefig(path_out + i + ".png", dpi=300, bbox_inches="tight")
+    fig.savefig(os.path.join(path_out, i + ".png"), dpi=300, bbox_inches="tight")
     plt.close(fig)
