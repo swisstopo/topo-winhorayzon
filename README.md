@@ -4,7 +4,7 @@ This fork is based on the HORAYZON repository. See the description below for mor
 In this version, the repository is intended to be ported to Windows and serve as a foundation for future projects.
 downlaod embree-4.4.0.x64.windiows.zip, source: https://github.com/RenderKit/embree/releases
 download oneapi-tbb-2022.3.0-win.zip, source: https://github.com/uxlfoundation/oneTBB/releases 
-
+The examples have been adapted but not fully tested
 
 # HORAYZON
 
@@ -12,9 +12,10 @@ Package to efficiently compute terrain parameters (like **horizon**, **sky view 
 The package also allows to compute **shadow maps** and **correction factors for downwelling direct shortwave radiation** for specific sun positions.
 Horizon computation is based on the high-performance ray-tracing library Intel&copy; Embree. Calculations are parallelised with Threading Building Blocks (C++ code).
 
-When you use HORAYZON, please cite:
+When you use TOPO-HORAYZON, please cite:
 
 **Steger, C. R., Steger, B. and Schär, C. (2022): HORAYZON v1.2: an efficient and flexible ray-tracing algorithm to compute horizon and sky view factor, Geosci. Model Dev., 15, 6817–6840, https://doi.org/10.5194/gmd-15-6817-2022**
+**swisstopo (2026) migrated V1.2 to Windows**
 
 and
 
@@ -44,97 +45,18 @@ The examples **horizon/gridded_curved_DEM_masked.py**, **horizon/gridded_planar_
 
 # Installation
 
-HORAYZON has been tested with **Python 3.13.3** (Linux) and **Python 3.13.3** (Mac OS X).
+TOPO-HORAYZON has been tested with **Python 3.13.3** (Windows)
 It is recommended to install dependencies via [Conda](https://docs.conda.io/en/latest/#), which covers all dependencies except **hmm**.
 Alternatively, HORAYZON can also be [installed without Conda](#Installation-without-Conda) (by e.g. using **pip** to install Python packages).
 Installation via **Conda** can be accomplished as follows for different platforms:
 
 ## Linux / Mac OS X
 
-Create an appropriate Conda environment
-
-**Core dependencies**
-```bash
-conda create -n horayzon_core -c conda-forge embree tbb-devel cython setuptools numpy scipy geographiclib tqdm requests xarray
-```
-
-**Base dependencies for examples**
-```bash
-conda create -n horayzon_base -c conda-forge embree tbb-devel cython setuptools numpy scipy geographiclib tqdm requests xarray netcdf4 matplotlib pillow skyfield pyproj ipython
-```
-
-**All dependencies for examples (masking and high-resolution DEM examples; GDAL dependency)**
-```bash
-conda create -n horayzon_all -c conda-forge embree tbb-devel cython setuptools numpy scipy geographiclib tqdm requests xarray netcdf4 matplotlib pillow skyfield pyproj ipython shapely fiona scikit-image rasterio trimesh
-```
-
-and **activate this environment**. The HORAYZON package can then be installed with:
-```bash
-git clone https://github.com/ChristianSteger/HORAYZON.git
-cd HORAYZON  
-python -m pip install .
-```
+The installation under Linux / Mac OS X has not yet been tested.
 
 ## Windows
 
-The installation under Windows has not yet been tested.
-
-## Optional installation of hmm
-**hmm** depends on **glm**, which can also be installed via Conda
-```bash
-conda install -c conda-forge glm
-```
-Alternatively, **glm** can also be built manually from [source](https://glm.g-truc.net/0.9.9/index.html). **hmm** can then be downloaded with
-```bash
-git clone https://github.com/fogleman/hmm.git
-cd hmm
-```
-The following two lines in **hmm**'s Makefile might have to be adapted to (the include directory in the first line is valid in case **glm**  was installed with Conda):
-```bash
-COMPILE_FLAGS = -std=c++11 -flto -O3 -Wall -Wextra -Wno-sign-compare -march=native -lGL -lglut -lGLEW -I<path to directory 'include' of conda environment>
-INSTALL_PREFIX = <binary install path>
-```
-Finally, **hmm** can be installed with
-```bash
-make
-make install
-```
-
-## Installation without Conda
-HORAYZON can also be built without Conda but this requires some additional manual steps.
-If not already available, the following two external libraries **Intel Embree** and **Threading Building Blocks (TBB)** have to be installed.
-This can be done either via a package manager (APT, MacPorts, etc.) or by manually building them from source.
-Afterwards, the required Python packages have to be installed (for instance with **pip**) and the HORAYZON package can be downloaded:
-
-```bash
-git clone https://github.com/ChristianSteger/HORAYZON.git
-cd HORAYZON
-```
-
-The setup file **setup_manual.py** must then be adapted to specify the **include** and **library** paths for the external libraries and to select a compiler to build HORAYZON.
-Finally, the HORAYZON package can be installed with:
-
-```bash
-mv setup_manual.py setup.py
-python -m pip install .
-```
-
-# Usage
-
-The usage of the packages is best illustrated by means of examples, which can either be run in a Python IDE (like PyCharm or Spyder) or in the terminal.
-To run the examples, the path **path_out** must be adapted in the example script to a location that provides enough disk space.
-For the example **horizon/gridded_planar_DEM_2m.py**, the path to the hmm executable (**hmm_ex**) has to be additionally adapted.
-All input [DEM or auxiliary data](#Digital-elevation-model-and-auxiliary-data) required for running the examples is downloaded automatically.
-When HORAYZON tries to download auxiliary data for the first time, a local path for the data has to be provided by the user.
-This path is saved in the text file *path_aux_data.txt*, which is stored in the directory to which the HORAYZON package was installed.
-In case this path is unknown, it can be found by running
-
-```bash
-import horayzon
-print(horayzon.__file__)
-```
-
-in Python. If the auxiliary data is later on moved manually to a new directory, the path in *path_aux_data.txt* has to be adapted accordingly.
+The installation under Windows has been tested.
 
 ## Examples: Terrain parameters (slope, horizon and sky view factor)
 
