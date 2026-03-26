@@ -26,6 +26,7 @@ from rasterio.transform import Affine
 from shapely.geometry import shape
 import datetime as dt
 import horayzon as hray
+import sys
 
 # -----------------------------------------------------------------------------
 # Settings
@@ -42,7 +43,7 @@ ellps = "WGS84"  # Earth's surface approximation (sphere, GRS80 or WGS84)
 dem_files_url = "https://e4ftl01.cr.usgs.gov//DP109/MEASURES/" \
                 + "NASADEM_NC.001/2000.02.11/NASADEM_NC_nNNeEEE.nc"
 dem_files_extent = {"lat": (34, 36 + 1), "lon": (75, 78 + 1)}
-path_out = "/Users/csteger/Desktop/Output/"
+path_out = os.path.join(r"C:\\", "temp", "topo-winhorayzon")
 file_sw_dir_cor = "sw_dir_cor_NASADEM_Karakoram.nc"
 gamdam_file_url = "https://store.pangaea.de/Publications/Sakai_2018/" \
                   + "gamdam20180404_001_SouthAsiaWest.zip"
@@ -54,27 +55,41 @@ gamdam_file_url = "https://store.pangaea.de/Publications/Sakai_2018/" \
 # Check if output directory exists
 if not os.path.isdir(path_out):
     raise FileNotFoundError("Output directory does not exist")
-path_out += "shadow/gridded_NASADEM_Karakoram/"
+path_out = os.path.join(path_out, "shadow", "gridded_NASADEM_Karakoram")
 if not os.path.isdir(path_out):
     os.makedirs(path_out)
 
 # Download NASADEM tiles for Karakoram
 print("Download NASADEM tiles for Karakoram:")
-path_out_tiles = path_out + "NASADEM_tiles/"
+path_out_tiles = os.path.join(path_out, "NASADEM_tiles")
+alltilesfound = True
 if not os.path.isdir(path_out_tiles):
     os.mkdir(path_out_tiles)
 for i in range(*dem_files_extent["lon"]):
     for j in range(*dem_files_extent["lat"]):
         tile = dem_files_url.replace("NN", str(j)) \
             .replace("EEE", str(i).zfill(3))
-        subprocess.call("wget -P " + path_out_tiles + " " + tile, shell=True)
+        localtile = os.path.join(path_out_tiles, tile.rsplit('/', 1)[-1])
+        if not os.path.isfile(localtile):
+            print(f"please downlaod first tile {tile} to {localtile}")
+            alltilesfound = False
+if not alltilesfound:
+    print("rerun script after downloading all tiles")
+    sys.exit()
 
 # Download GAMDAM shapefile for South Asia West
-hray.download.file(gamdam_file_url, path_out)
-with zipfile.ZipFile(path_out + "gamdam20180404_001_SouthAsiaWest.zip", "r") \
-        as zip_ref:
-    zip_ref.extractall(path_out + "gamdam20180404_001_SouthAsiaWest")
-os.remove(path_out + "gamdam20180404_001_SouthAsiaWest.zip")
+if not os.path.isfile(
+    os.path.join(
+        path_out, 
+        "gamdam20180404_001_SouthAsiaWest", 
+        "gamdam20180404_001_SouthAsiaWest.shp"
+        )
+    ):
+    hray.download.file(gamdam_file_url, path_out)
+    with zipfile.ZipFile(path_out + "gamdam20180404_001_SouthAsiaWest.zip", "r") \
+            as zip_ref:
+        zip_ref.extractall(path_out + "gamdam20180404_001_SouthAsiaWest")
+    os.remove(path_out + "gamdam20180404_001_SouthAsiaWest.zip")
 
 # Load required DEM data (including outer boundary zone)
 domain_outer = hray.domain.curved_grid(domain, dist_search)
