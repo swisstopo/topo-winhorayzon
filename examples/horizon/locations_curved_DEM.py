@@ -44,8 +44,9 @@ hori_acc = 0.1  # [degree]
 # Paths and file names
 dem_file_url = "https://srtm.csi.cgiar.org/wp-content/uploads/files/" \
                + "srtm_5x5/TIFF/srtm_38_03.zip"
-path_out = "/Users/csteger/Desktop/Output/"
+path_out = os.path.join(r"C:\\", "temp", "topo-winhorayzon")
 file_hori = "hori_SRTM_Switzerland.nc"
+path_to_aux_data = r"C:\temp/"
 
 # -----------------------------------------------------------------------------
 # Prepare digital elevation model data
@@ -54,16 +55,18 @@ file_hori = "hori_SRTM_Switzerland.nc"
 # Check if output directory exists
 if not os.path.isdir(path_out):
     raise FileNotFoundError("Output directory does not exist")
-path_out += "horizon/locations_SRTM_Switzerland/"
+path_out = os.path.join(path_out, "horizon", "locations_SRTM_Switzerland")
 if not os.path.isdir(path_out):
     os.makedirs(path_out)
 
 # Download and unzip SRTM tile (5 x 5 degree)
-print("Download SRTM tile (5 x 5 degree):")
-hray.download.file(dem_file_url, path_out)
-with zipfile.ZipFile(path_out + "srtm_38_03.zip", "r") as zip_ref:
-    zip_ref.extractall(path_out + "srtm_38_03")
-os.remove(path_out + "srtm_38_03.zip")
+file_dem = os.path.join(path_out,"srtm_38_03", "srtm_38_03.tif")
+if not os.path.isfile(file_dem):
+    print("Download SRTM tile (5 x 5 degree):")
+    hray.download.file(dem_file_url, path_out)
+    with zipfile.ZipFile(path_out + "srtm_38_03.zip", "r") as zip_ref:
+        zip_ref.extractall(path_out + "srtm_38_03")
+    os.remove(path_out + "srtm_38_03.zip")
 
 # Load required DEM data (including outer boundary zone)
 lon_loc = np.array([loc_sel[i][1] for i in loc_sel.keys()], dtype=np.float64)
@@ -72,13 +75,13 @@ domain = {"lon_min": lon_loc.min(), "lon_max": lon_loc.max(),
           "lat_min": lat_loc.min(), "lat_max": lat_loc.max()}
 # domain boundaries [degree]
 domain_outer = hray.domain.curved_grid(domain, dist_search, ellps)
-file_dem = path_out + "srtm_38_03/srtm_38_03.tif"
+
 lon, lat, elevation = hray.load_dem.srtm(file_dem, domain_outer,
                                          engine="pillow")
 # -> GeoTIFF can also be read with GDAL if available (-> faster)
 
 # Compute ellipsoidal heights
-elevation += hray.geoid.undulation(lon, lat, geoid="EGM96")  # [m]
+elevation += hray.geoid.undulation(lon, lat, geoid="EGM96", path_to_aux_data=path_to_aux_data)  # [m]
 
 # Compute ECEF coordinates
 x_ecef, y_ecef, z_ecef = hray.transform.lonlat2ecef(*np.meshgrid(lon, lat),
@@ -214,8 +217,8 @@ for i in list(loc_sel.keys()):
     ax_l = plt.axes()
     ind = list(loc_sel.keys()).index(i)
     plt.plot(np.rad2deg(azim), np.rad2deg(hori[ind, :]), color="black", lw=1.5)
-    plt.xlabel("Azimuth angle (measured clockwise from North) [$^{\circ}$]")
-    plt.ylabel("Horizon elevation angle [$^{\circ}$]")
+    plt.xlabel("Azimuth angle (measured clockwise from North) [$^{\\circ}$]")
+    plt.ylabel("Horizon elevation angle [$^{\\circ}$]")
     plt.xlim([-5.0, 365.0])
     ax_r = ax_l.twinx()
     plt.fill_between(np.rad2deg(azim), 0.0, hori_dist[ind, :], color="blue",
@@ -225,8 +228,8 @@ for i in list(loc_sel.keys()):
     plt.title(i.replace("_", " "), fontsize=12, fontweight="bold",
               loc="left")
     title = "Slope angle: %.1f" % topo_param[i]["slope_angle"] + \
-            "$^{\circ}$, slope aspect: %.1f" % topo_param[i]["slope_aspect"] \
-            + "$^{\circ}$, SVF: %.2f" % topo_param[i]["svf"]
+            "$^{\\circ}$, slope aspect: %.1f" % topo_param[i]["slope_aspect"] \
+            + "$^{\\circ}$, SVF: %.2f" % topo_param[i]["svf"]
     plt.title(title, fontsize=12, loc="right")
     fig.savefig(path_out + i + ".png", dpi=300, bbox_inches="tight")
     plt.close(fig)
